@@ -21,6 +21,6 @@ The **master** branch contains:
 * the outcome html file *MachineLearningProject.html*
 
 The **gh-pages** branch is used to visualize [the report as a web page,
- at this link](http://angeliflavio.github.io/practical-machine-learning/) 
+ at this link](http://angeliflavio.github.io/machine-learning-project/) 
 and contains the file *index.html* that GitHub uses to create the online page.
 
