@@ -1,0 +1,143 @@
+---
+title: "Practical Machine Learning Project"
+author: "Flavio Angeli"
+date: "18 July 2017"
+output: 
+    html_document:
+        keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Instructions  
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here](http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+
+## Data uploading
+```{r message=FALSE,warning=FALSE}
+# Packages
+library(caret)
+
+# Data uploading
+url_train <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+url_test <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+download.file(url_train,'train.csv')
+train_data <- read.csv('train.csv')
+download.file(url_test,'test.csv')
+test_data <- read.csv('test.csv')
+```
+
+## Exploratory analysis  
+The training data contains 19622 rows and 160 columns, of which 158 are predictors.
+```{r}
+dim(train_data)
+```
+```{r}
+dim(test_data)
+```
+The variable we want to predict is **classe**, the manner in which they did the exercise. In particular six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+```{r}
+levels(train_data$classe)
+```
+Observing the columns (variables), it is possible to notice that the first seven columns do not seem to be useful predictors. They are variables related to the partecipants and the time when the experiment was conducted. 
+```{r}
+# Remove first seven columns
+exper <- names(train_data[1:7])
+exper
+train_data <- train_data[,8:160]
+```
+
+The data set contains many NA values, for this reason the columns with NA values are not considered for training the model. (Imputation could have been another option.)
+```{r}
+# Columns with NA values are not considered in the model
+nas <- apply(train_data,2,anyNA)
+columns_notNA <- names(nas[!nas])
+train_data <- train_data[,columns_notNA]
+dim(train_data)
+```
+
+Another step is to remove the variables with near zero variance, they are not useful as predictors for the model.
+```{r}
+# Check and remove near zero var columns
+zerovar <- nearZeroVar(train_data,saveMetrics = T)
+train_data <- train_data[,zerovar$nzv==FALSE]
+dim(train_data)
+```
+
+Before moving on with the model fitting, the **train_data** set is split into two sets to train different models and select (test) the best performing one. In this way the initial testing set downloaded at the beginning is only going to be used for the final prediction with the best model. Using it to select the best model would not be efficient.
+
+```{r}
+# From train_data create training and testing 
+inTrain <- createDataPartition(train_data$classe,p=0.7,list = FALSE)
+train_model <- train_data[inTrain,]
+test_model <- train_data[-inTrain,]
+```
+
+
+## Model
+Because this is a classification problem the machine learning models tested are Random Forest and Gradient Boosting Machine (GBM).
+
+A **Random Forest** model is trained, using cross validation to determine the parameters and setting it   5 folds (lower than default of 10 to save computing time). 
+
+```{r message=FALSE, cache=TRUE,warning=FALSE}
+# Train a random forest 
+set.seed(123)
+trControl <- trainControl(method = 'cv',number = 5)
+fit_rf <- train(classe~., data = train_model,method='rf',trControl=trControl,prox=T)
+fit_rf$finalModel
+```
+Now we verify the model on the *test_model* set to see how well it performs. 
+```{r}
+# Prediction on test data
+pred_rf <- predict(fit_rf,test_model)
+conf_rf <- confusionMatrix(pred_rf,test_model$classe)
+conf_rf
+```
+In the following chart, we can see how the error drastically decreases with the increasing number of trees.
+```{r}
+# Plot error versus number of trees
+plot(fit_rf$finalModel,main = 'Random Forest Model')
+```
+
+It is also possible to see the importance of the predictors used in the model. 
+```{r}
+# See predictors importance in the rf model
+varImp(fit_rf)
+```
+
+The second model is **Gradient Boosting Machine (GBM)**.
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+# Train gbm model
+fit_gbm <- train(classe~.,data = train_model,method='gbm',trControl=trControl,verbose=F)
+fit_gbm$finalModel
+```
+Now we verify the model on the *test_model* data set to see how well it performs. 
+```{r}
+# Prediction from gbm
+pred_gbm <- predict(fit_gbm,test_model)
+conf_gbm <- confusionMatrix(pred_gbm,test_model$classe)
+conf_gbm
+```
+
+We can now compare the **Accuracy** of the two models and notice that Random Forest is the best performing model.
+```{r}
+# Compare the two models 
+acc_rf <- round(conf_rf$overall[1],4)
+acc_gbm <- round(conf_gbm$overall[1],4)
+df <- data.frame('Models'= c('Accuracy','Out of sample error estimate'),
+            'Random Forest'=c(acc_rf,1-acc_rf),
+            'GBM'=c(acc_gbm,1-acc_gbm))
+print(df,row.names=F)
+```
+
+## Prediction
+According to the accuracy measured in the previous section, the best model is the **Random Forest**. This model can now be used to predict **classe** for the test data (20 different test cases).
+```{r}
+# Predict on the 20 different test cases.
+pred_final <- predict(fit_rf,test_data)
+pred_final
+```
+
