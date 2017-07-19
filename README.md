@@ -20,8 +20,8 @@ The **master** branch contains:
 * the outcome Markdown file *MachineLearningProject.md*
 * the outcome html file *MachineLearningProject.html*
 
-The **gh-pages** branch is used to visualize the report as a web page, 
-to open the report online (click here)[...]:
+The **gh-pages** branch is used to visualize the report as a web page,
+ at this (link)[http://angeliflavio.github.io/practical-machine-learning]:
 
 * the outcome html file *MachineLearningProject.html*
 
